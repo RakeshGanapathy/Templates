@@ -1,25 +1,25 @@
-AWSTemplateFormatVersion: 2021-06-07
+AWSTemplateFormatVersion: '2010-09-09'
 Description: This template create an Application Load Balancer with EC2 InfraStructure
 Parameters:
   InstanceType:
     Description: WebServer EC2 instance type
     Type: String
     Default: t2.micro
-  KeyName:
-    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
-    Type: 'AWS::EC2::KeyPair::KeyName'
-    Default: ''  
   AmazonImageID:
     Description: The ID of the Amazon machine image (AMI)
     Type: String
-    Default: ''
+    Default: 'ami-0ad704c126371a549'
+  IamInstanceProfile:
+    Description: The IamInstanceProfile of an instance
+    Type: String
+    Default: ec2servicerole
 Resources:
   EC2Instance:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: !Ref InstanceType
-      KeyName: !Ref KeyName
       ImageId: !Ref AmazonImageID 
+      IamInstanceProfile: !Ref IamInstanceProfile
       Tags:
         - Key: "Testing"
           Value: EC2 | Private Subnet 1
