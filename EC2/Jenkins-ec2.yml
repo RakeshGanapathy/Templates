@@ -20,8 +20,7 @@ Resources:
       InstanceType: !Ref InstanceType
       ImageId: !Ref AmazonImageID 
       IamInstanceProfile: !Ref IamInstanceProfile
-      SecurityGroupIds:
-        - sg-088ce769b248d5f05
+      SecurityGroups: [!Ref 'InstanceSecurityGroup']
       Tags:
         - Key: "Testing"
           Value: EC2 | Private Subnet 1
@@ -49,5 +48,14 @@ Resources:
             yum install jenkins -y
             service jenkins start 
             cat /var/lib/jenkins/secrets/initialAdminPassword
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: 0.0.0.0/0
 
             
