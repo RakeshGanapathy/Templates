@@ -4,7 +4,7 @@ Parameters:
   InstanceType:
     Description: WebServer EC2 instance type
     Type: String
-    Default: t2.micro
+    Default: t2.medium
   AmazonImageID:
     Description: The ID of the Amazon machine image (AMI)
     Type: String
@@ -12,7 +12,7 @@ Parameters:
   IamInstanceProfile:
     Description: The IamInstanceProfile of an instance
     Type: String
-    Default: ec2servicerole
+    Default: EC2-SSM
 Resources:
   EC2Instance:
     Type: AWS::EC2::Instance
@@ -23,6 +23,14 @@ Resources:
       Tags:
         - Key: "Testing"
           Value: EC2 | Private Subnet 1
+      BlockDeviceMappings:
+        - DeviceName: /dev/sdc
+          Ebs:
+            SnapshotId: snap-0a46e247fb46f219b
+            VolumeSize: 30
+            VolumeType: gp2
+            Iops: 1000
+            DeleteOnTermination: true
       UserData:
         Fn::Base64:
           !Sub |
@@ -39,3 +47,5 @@ Resources:
             sudo yum install jenkins
             sudo service jenkins start
             sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+
+ 
