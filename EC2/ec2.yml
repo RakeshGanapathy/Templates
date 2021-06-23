@@ -26,10 +26,10 @@ Resources:
       BlockDeviceMappings:
         - DeviceName: /dev/sdc
           Ebs:
-            SnapshotId: snap-0a46e247fb46f219b
-            VolumeSize: 30
-            VolumeType: gp2
-            Iops: 1000
+            SnapshotId: snap-041de31327a858319
+            VolumeSize: 8
+            VolumeType: io1
+            Iops: 400
             DeleteOnTermination: true
       UserData:
         Fn::Base64:
