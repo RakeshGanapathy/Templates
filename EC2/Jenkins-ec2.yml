@@ -4,22 +4,35 @@ Parameters:
   InstanceType:
     Description: WebServer EC2 instance type
     Type: String
-    Default: t2.medium
+    Default: t2.micro
   AmazonImageID:
     Description: The ID of the Amazon machine image (AMI)
     Type: String
     Default: 'ami-0ad704c126371a549'
-  IamInstanceProfile:
-    Description: The IamInstanceProfile of an instance
+  JenkinsAutomationRole:
+    Description: The JenkinsAutomationRole of an instance
     Type: String
-    Default: EC2-SSM
+    Default: jenkinsautomationrole
+  JenkinsAutomationProfile:
+    Description: The JenkinsAutomationProfile for JenkinsAutomationRole of an instance
+    Type: String
+    Default: JenkinsAutomationProfile
+  IAMManagedPolicy:
+    Description: ManagedPolicy for JenkinsAutomationRole of an instance
+    Type: String
+    Default: PutS3ObjectPolicy
+  BucketPrefix:
+    Description: The BucketPrefix of an instance
+    Type: String
+    Default: cfm-s3
 Resources:
   EC2Instance:
+    DependsOn: InstanceSecurityGroup
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: !Ref InstanceType
       ImageId: !Ref AmazonImageID 
-      IamInstanceProfile: !Ref IamInstanceProfile
+      IamInstanceProfile: !Ref ManagedInstanceProfile
       SecurityGroups: [!Ref 'InstanceSecurityGroup']
       Tags:
         - Key: "Testing"
@@ -49,13 +62,58 @@ Resources:
             service jenkins start 
             cat /var/lib/jenkins/secrets/initialAdminPassword
   InstanceSecurityGroup:
+    DependsOn: ManagedInstanceProfile
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Enable SSH access via port 
       SecurityGroupIngress:
       - IpProtocol: tcp
-        FromPort: 0
-        ToPort: 65535
+        FromPort: 8080
+        ToPort: 8080
         CidrIp: 0.0.0.0/0
-
-            
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        CidrIp: 0.0.0.0/0  
+  EC2SSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ssm.amazonaws.com
+            - ec2.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+      Path: "/"
+      RoleName: !Ref JenkinsAutomationRole
+  ManagedInstanceProfile:
+    DependsOn: EC2SSMRole
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref EC2SSMRole
+      InstanceProfileName: JenkinsAutomationProfile   
+  S3ManagedPolicy:
+    DependsOn: EC2SSMRole
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+        Description: Policy for putting S3 Objects
+        ManagedPolicyName: !Ref IAMManagedPolicy
+        PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: "S3Policy"
+              Effect: Allow
+              Action:
+              - s3:PutObject
+              Resource: 
+              - !Sub 'arn:aws:s3:::${BucketPrefix}*'
+        Roles:
+           - !Ref JenkinsAutomationRole
