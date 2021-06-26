@@ -25,7 +25,9 @@ Parameters:
     Description: The BucketPrefix of an instance
     Type: String
     Default: cfm-s3
+
 Resources:
+
   EC2Instance:
     DependsOn: InstanceSecurityGroup
     Type: AWS::EC2::Instance
@@ -34,9 +36,6 @@ Resources:
       ImageId: !Ref AmazonImageID 
       IamInstanceProfile: !Ref ManagedInstanceProfile
       SecurityGroups: [!Ref 'InstanceSecurityGroup']
-      Tags:
-        - Key: "Testing"
-          Value: EC2 | Private Subnet 1
       BlockDeviceMappings:
         - DeviceName: /dev/sdc
           Ebs:
@@ -56,11 +55,18 @@ Resources:
             service httpd start
             yum install java-1.8.0 -y
             yum install java-1.8.0-openjdk -y
+            yum install git -y
+            yum install maven -y
+            yum install docker -y
+            systemctl start docker
+            chmod 777 /var/run/docker.sock
             wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat/jenkins.repo
             rpm --import https://pkg.jenkins.io/redhat/jenkins.io.key
             yum install jenkins -y
             service jenkins start 
             cat /var/lib/jenkins/secrets/initialAdminPassword
+            echo "Initial Admin Password: $(cat /var/lib/jenkins/secrets/initialAdminPassword)" > /var/www/html/index.html
+
   InstanceSecurityGroup:
     DependsOn: ManagedInstanceProfile
     Type: AWS::EC2::SecurityGroup
@@ -75,6 +81,11 @@ Resources:
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0  
+      - IpProtocol: tcp
+        FromPort: 8090
+        ToPort: 8090
+        CidrIp: 0.0.0.0/0  
+
   EC2SSMRole:
     Type: AWS::IAM::Role
     Properties:
@@ -92,6 +103,7 @@ Resources:
       - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
       Path: "/"
       RoleName: !Ref JenkinsAutomationRole
+
   ManagedInstanceProfile:
     DependsOn: EC2SSMRole
     Type: AWS::IAM::InstanceProfile
@@ -99,7 +111,8 @@ Resources:
       Path: "/"
       Roles:
       - !Ref EC2SSMRole
-      InstanceProfileName: JenkinsAutomationProfile   
+      InstanceProfileName: !Ref JenkinsAutomationProfile   
+  
   S3ManagedPolicy:
     DependsOn: EC2SSMRole
     Type: AWS::IAM::ManagedPolicy
