@@ -36,6 +36,7 @@ Resources:
       ImageId: !Ref AmazonImageID 
       IamInstanceProfile: !Ref ManagedInstanceProfile
       SecurityGroups: [!Ref 'InstanceSecurityGroup']
+      Monitoring: true
       BlockDeviceMappings:
         - DeviceName: /dev/sdc
           Ebs:
@@ -100,7 +101,8 @@ Resources:
           Action: sts:AssumeRole
       ManagedPolicyArns:
       - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-      - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+      - arn:aws:iam::aws:policy/AWSCloudFormationFullAccess
+      - arn:aws:iam::aws:policy/AmazonS3FullAccess
       Path: "/"
       RoleName: !Ref JenkinsAutomationRole
 
