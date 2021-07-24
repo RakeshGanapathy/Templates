@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template create an lambda, cloudwatch , s3 trigger 
+Parameters:
+  Role:
+    Description: The service role for an lambda
+    Type: String
+    Default: lambdaservicerole
+  Timeout:
+    Description: The service role for an lambda
+    Type: String
+    Default: 20
+  FunctionName:
+    Description: The service role for an lambda
+    Type: String
+    Default: MyS3WatcherFunction
+  BucketName:
+    Description: The service role for an lambda
+    Type: String
+    Default: event-capture
+
+Resources:
+  Lambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName : !Ref FunctionName
+      Code:
+        ZipFile: |
+          import json
+          import os
+
+          def lambda_handler(event, context):
+            print(event)
+            # TODO implement
+            source = event['Records'][0]['eventName']
+            identity = event['Records'][0]['userIdentity']['principalId']
+            print(identity)
+            print(source)
+            print(os.environ['env'])
+            print(str(event))
+            return event
+      Environment: 
+         Variables:
+           env : Dev
+           type : test
+      Handler: index.lambda_handler
+      Runtime: python3.8
+      MemorySize: 128
+      Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${Role}'
+      Timeout: !Ref Timeout
+      Description: Invoke a function during s3 put call.
+  
+  S3:
+    Type: AWS::S3::Bucket
+    DependsOn: BucketPermission
+    Properties:
+      BucketName: !Ref BucketName
+      NotificationConfiguration: 
+        LambdaConfigurations: 
+          - Event: "s3:ObjectCreated:*"
+            Function: !GetAtt Lambda.Arn
+            Filter:
+              S3Key: 
+                Rules:
+                  - Name : suffix
+                    Value : .json
+  
+  BucketPermission:
+    DependsOn: Lambda
+    Type : AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: !Ref FunctionName
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: !Sub "arn:aws:s3:::${BucketName}"
+
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+          ["/",["","aws","lambda", !Ref FunctionName]]
+      RetentionInDays: 7
