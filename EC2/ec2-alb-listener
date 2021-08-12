@@ -1,0 +1,174 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This template is to create an EC2 instance,IAM roles with SSM Policy,Security group and deploy jenkins in it
+Parameters:
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t2.micro
+  AmazonImageID:
+    Description: The ID of the Amazon machine image (AMI)
+    Type: String
+    Default: 'ami-04db49c0fb2215364'
+  Ec2ServiceRole:
+    Description: The ID of the Amazon machine image (AMI)
+    Type: String
+    Default: ec2-alb-servicerole
+  SubnetId1:
+    Description:  subnet value
+    Type: String
+    Default: 'subnet-0f95cf43'
+  SubnetId2:
+    Description: subnet value
+    Type: String
+    Default: 'subnet-636d9808'
+  SecurityGroup:
+    Description: Security Group for alb
+    Type: String
+    Default: 'sg-0ef687698b23fb0ad'
+  VpcId:
+    Description: Security Group for alb
+    Type: String
+    Default: 'vpc-5689463d'
+  ApplicationLoadBalancer:
+    Description: ApplicationLoadBalancer 
+    Type: String
+    Default: t2.micro
+
+Resources:
+  EC2Instance:
+    DependsOn: InstanceSecurityGroup
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      ImageId: !Ref AmazonImageID
+      IamInstanceProfile: !Ref ManagedInstanceProfile
+      Monitoring: true
+      SecurityGroups: 
+        - !Ref InstanceSecurityGroup
+      BlockDeviceMappings:
+        - DeviceName: /dev/sdc
+          Ebs:
+            SnapshotId: snap-0bdcc50b291983cea
+            VolumeSize: 8
+            VolumeType: io1
+            Iops: 400
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            sudo su
+            yum update -y
+            yum install -y httpd
+            yum install java -y
+            echo "Hello Team I ping from $(hostname -f)" > /var/www/html/index.html
+            service httpd start
+      Tags:
+        - Key: team
+          Value: dp
+      
+  InstanceSecurityGroup:
+    DependsOn: Role
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable SSH access via port 
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ssm.amazonaws.com
+            - ec2.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Path: "/"
+      RoleName: !Ref Ec2ServiceRole
+      
+  ManagedInstanceProfile:
+    DependsOn: Role
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref Role
+      InstanceProfileName: !Ref Ec2ServiceRole
+   
+  
+          
+  #Create an Application Load Balancer
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: WAFApplicationLoadBalancer
+      SecurityGroups:
+        - !Ref SecurityGroup
+      Subnets: 
+        - !Ref SubnetId1
+        - !Ref SubnetId2
+   
+  ALBTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      Matcher:
+        HttpCode: 200,302
+      Name: MyWebServers
+      Port: 80
+      Protocol: HTTP
+      Targets:
+        - Id: !Ref EC2Instance
+          Port: 80
+      TargetType: instance
+      UnhealthyThresholdCount: 5
+      VpcId: !Ref VpcId
+      
+#Create a Listener on Port 80
+  ALBListener:
+    Type : AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward 
+          TargetGroupArn: !Ref ALBTargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+Outputs:
+# Export Target Group
+  ALBTargetGroup:
+    Description: Webserver target group 
+    Export:
+      Name: !Sub ${AWS::StackName}-ALBTargetGroup
+    Value: !Ref ALBTargetGroup
+
+# Export Application Load Balancer Dns Name
+  ApplicationLoadBalancerDnsName:
+    Description: Application Load Balancer DNS Name 
+    Export:
+      Name: !Sub ${AWS::StackName}-ApplicationLoadBalancerDnsName
+    Value: !GetAtt ApplicationLoadBalancer.DNSName 
+
+# Export Application Load Balancer Zone ID
+  ApplicationLoadBalancerZoneID:
+    Description: Application Load Balancer Canonical Hosted Zone ID
+    Export:
+      Name: !Sub ${AWS::StackName}-ApplicationLoadBalancerZoneID
+    Value: !GetAtt ApplicationLoadBalancer.CanonicalHostedZoneID
